@@ -1,0 +1,34 @@
+valgrind --track-origins=yes --leak-check=yes ./bin/mapScenario
+../data/graphs/extra_social/PGPgiantcompo.graph --k=16 --seed=1
+--preconfiguration=eco --proc_graph_type=grid --proc_graph_extensions=4x4 --proc_graph_bandwidths=1x1 --mapping_algo=alma --numberHierarchies=10 | & cat > guck
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/c+/KaHIP/src/extern/argtable-2.10/lib
+
+scons program=quargs variant=optimized -j 4
+scons program=partScenario variant=optimized -j 4
+scons program=repartScenario variant=optimized -j 4
+scons program=mapScenario variant=optimized -j 4
+
+./bin/quargs ../data/graphs/extra_social/PGPgiantcompo.graph --preconfiguration=eco --k=2 --new_k=2 --imbalance=20 --new_imbalance=3
+./bin/partScenario ../data/graphs/extra_social/PGPgiantcompo.graph --preconfiguration=eco --k=2 --imbalance=3
+./bin/repartScenario ../data/graphs/extra_social/PGPgiantcompo.graph --preconfiguration=eco --k=2 --new_k=2 --imbalance=20 --new_imbalance=3
+./bin/mapScenario ../data/graphs/extra_social/PGPgiantcompo.graph --k=256 --seed=1 --preconfiguration=eco --proc_graph_type=grid --proc_graph_extensions=16x16 --proc_graph_bandwidths=1x1x1x1 --mapping_algo=brandfassL
+
+job_queue | grep w | awk '{ printf"%d ", $1}'
+job_cancel
+
+ps aux | grep glantz
+killall kaffpa
+kill -9 `ps -ef | grep kaffpa | grep -v grep | awk '{print $2}'`
+
+screen
+command t
+screen -rl
+screen -S 23536 -X quit
+
+ls | grep -E graph | xargs rm
+
+bash
+find . -type f  -maxdepth 1 | wc -l
+
+setenv CCD 'c++ -I/usr/lib64/mpi/gcc/openmpi/include'

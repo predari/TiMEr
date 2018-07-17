@@ -1,0 +1,23 @@
+#########################################################
+############## TIME ON TOP OF SCOTCH ####################
+#########################################################
+# create initial mappings using scotch
+# save the mapping of only one seed (randomly seed=2) for each (graph x topology) problem 13(graphs)*5(topo) = 65 initial mappings
+# take the average of the times over all seeds for each (graph x topology) problem --> 65 average times (over 65*5)
+./starpart-run -g -r "MBENCH[files={coPapersDBLP.graph,as-22july06.graph,as-skitter.graph,email-EuAll.graph,loc-brightkite_edges.graph,loc-gowalla_edges.graph,soc-Slashdot0902.graph,wiki-Talk.graph},strats={SCOTCH/MAP},seeds={2,3,4,5},ubfactors={3}]"
+# take those 65 mappings and initial times and give it as an input in karma
+# to test time on top of scotch mapping (+ initial/identity, since identity does not change the mapping)
+# test for 10 seeds each (graph x topology) problem
+# do the following with a script (in papers/MULM/Experiments/TablesII-III/scripts/.)
+./bin/mapScenarioTiME ../../Data/PGPgiantcompo.graph --k=512 --seed=1 --input_partition=scotchPGPgiantcompo.graph13DGrid8 --preconfiguration=ecosocial --imbalance=3 --proc_graph_type=grid --proc_graph_extensions=8x8x8 --proc_graph_bandwidths=1x1x1 --mapping_algo=initial --filename_output=timescotchPGPgiantcompo.graph13DGrid8  --numberHierarchies=10
+#########################################################
+
+# to test kahip partitioning
+./bin/partScenario ../../Data/PGPgiantcompo.graph --k=512 --seed=1 --preconfiguration=ecosocial --imbalance=5
+
+# to test time on top of kahip partitioning + greedyallc + alma
+./bin/mapScenarioTiME ../../Data/PGPgiantcompo.graph --k=512 --seed=1 --preconfiguration=ecosocial --imbalance=5 --proc_graph_type=grid --proc_graph_extensions=8x8x8 --proc_graph_bandwidths=1x1x1 --mapping_algo=brandfassL --numberHierarchies=10
+
+# to test time on top of kahip partitioning + initial/identity +alma
+./bin/mapScenarioTiME ../../Data/PGPgiantcompo.graph --k=512 --seed=1 --preconfiguration=ecosocial --imbalance=5 --proc_graph_type=grid --proc_graph_extensions=8x8x8 --proc_graph_bandwidths=1x1x1 --mapping_algo=initial --numberHierarchies=10
+

@@ -1,0 +1,488 @@
+/*
+ * graph.cpp
+ *
+ *  Created on: Feb 14, 2017
+ *      Author: Roland */
+
+#include "../../alma_graph_access.h"
+#include "../permutation/permutation.h"
+#include "../utils/memory.h"
+#include "../utils/arith.h"
+#include <stdlib.h>
+#include <string>
+#include <iostream>
+#include <math.h>
+#include <map>
+#include <bitset>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <stdio.h>
+#include <queue>
+
+using namespace std;
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::setNumDigitsL(int64_t ndl) {
+  numDigitsL = ndl;
+}
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::setNumL(int64_t nl) {
+  numDigitsL = nl;
+}
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::getVertexLabelsFromPartition(alma_graph_access & g) {
+  /* Initially, vector vlabels contain the block IDs of the vertices. */
+  /* Block IDs are not necessarily consecutive! */
+    
+  int64_t maxBlockID = 0;
+  forall_nodes(g, v) {
+    if(vlabels[v] > maxBlockID) {
+      maxBlockID = vlabels[v];
+    }
+  } endfor
+  numDigitsBlockID = ceilLog2((double) (maxBlockID + 1));//OUTPUT PARAMETER!
+  cout << "numDigitsBlockID is " << numDigitsBlockID << endl;
+    
+  vector<int64_t> blockHits(maxBlockID + 1, 0);
+  forall_nodes(g, v) {
+    (blockHits[vlabels[v]])++;
+  } endfor
+  int64_t maxBlockSize = 0;
+  for(int64_t b = 0; b <= maxBlockID; b++) {
+    if(blockHits[b] > maxBlockSize) {
+      maxBlockSize = blockHits[b];
+    }
+  }
+    
+  numDigitsForID = ceilLog2((double) maxBlockSize);//OUTPUT PARAMETER!
+  cout << "numDigitsForID is " << numDigitsForID << endl;
+    
+  numDigitsL = numDigitsBlockID + numDigitsForID;//OUTPUT PARAMETER!
+  numL = 1 << numDigitsL;//OUTPUT PARAMETER!
+  cout << "The labels have " << numDigitsL << " digits" << endl;
+    
+  Permutation rho(numDigitsForID);
+  rho.ini();
+  cout << "rho from construction: " << endl;
+  rho.display();
+    
+  rho.shuffle();
+  cout << "rho after shuffling: " << endl;
+  rho.display();
+    
+  //reset blockHits
+  for(int64_t b = 0; b <= maxBlockID; b++) {
+    blockHits[b] = 0;
+  }
+    
+  //assignment of initial labels
+  vlabels.resize(g.number_of_nodes());
+  for (int64_t v = 0; v < g.number_of_nodes(); v++) {
+    int64_t vID = blockHits[vlabels[v]];
+    (blockHits[vlabels[v]])++;
+    vlabels[v] = (vlabels[v]) << numDigitsForID;
+    vlabels[v]+= rho.permute(vID);
+  }
+  //return(true);
+}
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::permuteVertexLabels(alma_graph_access & g, Permutation pi) {
+  for(int64_t l = 0; l < numL; l++) {
+    label2vertex[l] = UNDEFINED_NODE;
+  }
+  for(int64_t v = 0; v < g.number_of_nodes(); v++) {
+    int64_t newLabel = pi.permute(vlabels[v]);
+    vlabels[v] = newLabel;
+    label2vertex[newLabel] = v;
+  }
+}
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::makeVectorLabel2Vertex(alma_graph_access & g){
+  label2vertex.resize(g.number_of_nodes());
+  for(int64_t l = 0; l < numL; l++) {
+    label2vertex[l] = UNDEFINED_NODE;
+  }
+}
+
+/**
+ * flips position pos in binary representation of label l
+ * @param[in] Position pos.
+ * @param[in] label l
+ * @param[out] label l
+ */
+/*****************************************/
+/*****************************************/
+int64_t alma_graph_access::flipPosition(int64_t pos, int64_t& l) {
+  int64_t ll = l;
+  int64_t entryAtPosition = (ll >> pos) % 2;
+  if(entryAtPosition == 1) {
+    ll-= (1 << pos);
+  } else {
+    ll+= (1 << pos);
+  }
+  return ll;
+}
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::display(alma_graph_access & g) {
+  cout << endl;
+  cout << "*************************************************" << endl;
+  cout << "   Number of vertices is " << g.number_of_nodes() << endl;
+  cout << "   Number of edges is " << g.getNumNonZeros() / 2 << endl;
+  cout << "   Number of blocks is " << partition_config.k << endl;
+  cout << "   Number of labels is " << numL << endl;
+  cout << "   Number of digits of labels is " << numDigitsL << endl;
+  cout << "   numDigitsBlockID is " << numDigitsBlockID << endl;
+  cout << "   numDigitsForID is " << numDigitsForID << endl;
+
+  forall_nodes(g, v) {
+    cout << "      vertex " << v << " has label " << vlabels[v] << endl;
+  } endfor
+  cout << endl;
+
+  forall_nodes(g, v) {
+    forall_out_edges(g, e, v) {
+      cout << "      edge from " << v << " to " << g.getEdgeTarget(e) << " has weight " << G.getEdgeWeight(e) << endl;
+    } endfor
+  } endfor
+}
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::getDistances2vertex(alma_graph_access & g, vector<int64_t> &dist2v, int64_t v) {
+  forall_nodes(g, v) {
+    dist2v[i] = UNDEFINED_NODE;
+  } endfor
+    
+  queue<int64_t> q;
+  q.push(v);
+  dist2v[v] = 0;
+  while(q.empty() == false) {
+    int64_t f = q.front();
+    int64_t newDist = 1 + dist2v[f];
+    q.pop();
+    forall_out_edges(g, e, f) {
+      NodeID t = g.getEdgeTarget(e);
+      if(dist2v[t] == UNDEFINED_NODE) {
+	q.push(t);
+	dist2v[t] = newDist;
+      }
+    } endfor
+  }
+}
+
+/*****************************************/
+/*****************************************/
+bool alma_graph_access::getLabelsPartialCube(alma_graph_access & g) {
+  bool ret = true;
+  int64_t edgeID_outer = 0;
+  int64_t digit = 0;
+  vector<bool> edgeMarked(2*numE, false);
+  vector<int64_t> dist2v(numV);
+  vector<int64_t> dist2w(numV);
+  vlabels.resize(g.number_of_nodes());
+  forall_nodes(g, v) {
+    forall_out_edges(g, e, v) {
+      nodeID w = g.getEdgeTarget(e)
+      if((v < w) && (edgeMarked[edgeID_outer] == false)) {
+	//cout << "v and w are " << v << " and " << w << endl;
+	getDistances2vertex(dist2v, v);
+	getDistances2vertex(dist2w, w);
+	EdgeID edgeID_inner = 0;
+	forall_nodes(g, vv) {
+	  forall_out_edges(g, ee, vv) {
+	    if(vv < ww) {
+	      //cout << "   vv and ww are " << vv << " and " << ww << endl;
+	      if(dist2v[vv] == dist2v[ww]) {
+		cout << "vertices " << vv << " and " << ww << " both have distance " << dist2v[vv] << " to " << v << endl;
+		cout << "NOT A PARTIAL CUBE" << endl;
+		return(false);
+	      }
+	      if(dist2w[vv] == dist2w[ww]) {
+		cout << "vertices " << vv << " and " << ww << " both have distance " << dist2w[vv] << " to " << w << endl;
+		cout << "NOT A PARTIAL CUBE" << endl;
+		return(false);
+	      }
+	      if((dist2v[vv] + dist2w[ww]) != (dist2w[vv] + dist2v[ww])) {
+		if(edgeMarked[edgeID_inner] == true) {
+		  cout << "Edge " << edgeID_inner << " is in more than one cutset" << endl;
+		  cout << "NOT A PARTIAL CUBE" << endl;
+		  return(false);
+		}
+		//cout << "      Marking the edge between " << vv << " and " << ww << endl;
+		edgeMarked[edgeID_inner] = true;
+	      }
+	    }
+	    edgeID_inner++;
+	  }
+	}
+	for(int64_t u = 0; u < numV; u++) {
+	  if(dist2w[u] < dist2v[u]) {
+	    vlabels[u] += (1 << digit);
+	  }
+	}
+	digit++;
+	cout << "digit ist jetzt " << digit << endl;
+      }
+      edgeID_outer++;
+    } endfor
+  } endfor
+  return(ret);
+}
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::statisticsOnMissfits(alma_graph_access & g) {
+  for(int64_t pos = 0; pos < numDigitsL; pos++) {
+    int64_t numMissfits = 0;
+    forall_nodes(g, v1) {
+      int64_t label1 = vlabels[v1];
+      int64_t label2 = flipPosition(pos, label1);
+      int64_t v2 = label2vertex[label2];
+      if(v2 < 0) {
+	numMissfits++;
+      }
+    } endfor
+    cout << "Number of missfits at position " << pos << " is " <<   numMissfits << endl;
+  }
+}
+
+/*****************************************/
+/*****************************************/
+int64_t alma_graph_access::getVertexWithLabel(int64_t l) {
+  return(label2vertex[l]);
+}
+
+/*****************************************/
+/*****************************************/
+ EdgeWeight alma_graph_access::getTotalCut(alma_graph_access & g) {
+  EdgeWeight ret = 0;
+  forall_nodes(g, v) {
+    forall_out_edges(g, e, v) {
+      nodeID w = g.getEdgeTarget(e)
+      if(((vlabels[v]) >> getNumDigitsForID()) != ((vlabels[w]) >> getNumDigitsForID())) {
+	ret+=ewgt[i];
+      }
+    } endfor
+  } endfor
+  return(ret/2);
+}
+
+/*****************************************/
+/*****************************************/
+EdgeWeight alma_graph_access::hammingDistance(int64_t l1, int64_t l2) {
+  std::bitset<64> b1(l1);
+  std::bitset<64> b2(l2);
+  return((b1 ^ b2).count());
+}
+
+/*****************************************/
+/*****************************************/
+EdgeWeight alma_graph_access::getTotalCommunicationCost(alma_graph_access & g) {
+  EdgeWeight ret = 0;
+  forall_nodes(g, v) {
+    forall_out_edges(g, e, v) {
+      nodeID w = g.getEdgeTarget(e);
+      ret+=hammingDistance((vlabels[v]) >> numDigitsForID, (vlabels[w]) >> numDigitsForID);
+    } endfor
+  } endfor
+  return(ret/2);
+}
+
+
+/*****************************************/
+/*****************************************/
+alma_graph_access& alma_graph_access::contract(alma_graph_access & g, vector<int64_t>& parents) {
+  //initialization
+  alma_graph_access h;
+  h.numDigitsL = g.numDigitsL - 1;
+  h.numL = (g.numL) / 2;
+  h.label2vertex.resize(h.numL);
+  for(int64_t l = 0; l < h->numL; l++) {
+    h.label2vertex[l] = UNDEFINED_NODE;
+  }
+  parents.resize(g.number_of_vertices());
+    
+  //find number of vertices in h and build h.label2vertex, parents
+  nodeID number_nodes_in_h = 0;
+  forall_nodes(g, v) {
+    int64_t shortenedLabel_v = g.getLabel(v) >> 1;//shortendedLabel_v will be a label of a vertex of h
+    if(h.label2vertex[shortenedLabel_v] == UNDEFINED_NODE) {//shortendedLabel_v not yet encountered
+      h.label2vertex[shortenedLabel_v] = number_nodes_in_h;
+      parents[v] = number_nodes_in_h;
+      number_nodes_in_h++;
+    } else {
+      parents[v] = h.label2vertex[shortenedLabel_v];
+    }
+  } endfor
+    
+  //write h->vlabels
+  h->vlabels.resize(number_nodes_in_h);
+  for(int64_t l = 0; l < h->numL; l++) {
+    NodeID v = h->label2vertex[l];
+    if(v >= 0) {
+      h.vlabels[v] = l;
+    }
+  }
+
+  //for each vertex, vertex_h, find its neighbors and the weights of the edges to these neighbors
+  vector<map<NodeID, EdgeWeight>> neighborsAndWeights(number_nodes_in_h);
+  edgeID edgeID_h = 0;
+  for(nodeID vertex_h = 0; vertex_h < number_nodes_in_h; vertex_h++) {
+    //vertex_g0, vertex_g1 are the vertices of g contracted to vertex_h
+    //one of them might not exist
+    int64_t label_g0 = ((uint64_t)(h->vlabels[vertex_h])) << 1;
+    int64_t vertex_g0 = g.label2vertex[label_g0];
+    int64_t vertex_g1 = g.label2vertex[1 + label_g0];
+    if(vertex_g0 >= 0) {//vertex_g0 exists
+      forall_out_edges(g, e, vertex_g0) {
+	nodeID neigh = h->label2vertex[(g.getLabel(g.getEdgeTarget(e))) >> 1];
+	if(neigh != vertex_h) {//neigh is a neighbor of vertex_h
+	  std::pair<std::map<NodeID, EdgeWeight>::iterator,bool> ret =
+	    (neighborsAndWeights[vertex_h]).insert(std::pair<NodeID,EdgeWeight>(neigh, g.getEdgeWeight(e)));
+	  if(ret.second == false) {
+	    ret.first->second+= g.getEdgeWeight(e);
+	  }
+	}
+      } endfor
+    }
+    if(vertex_g1 >= 0) {//vertex_g1 exists
+      forall_out_edges(g, e, vertex_g1) {
+	nodeID neigh = h->label2vertex[(g.getLabel(g.getEdgeTarget(e))) >> 1];
+	if(neigh != vertex_h) {//neigh is a neighbor of vertex_h
+	  std::pair<std::map<NodeID, EdgeWeight>::iterator, bool> ret =
+	    (neighborsAndWeights[vertex_h]).insert(std::pair<NodeID, EdgeWeight>(neigh, g.getEdgeWeight(e)));
+	  if(ret.second == false) {
+	    ret.first->second+= g.getEdgeWeight(e);
+	  }
+	}
+      } endfor
+    }
+  }
+
+  //determine number of nonzeros and edges in h
+  edgeID number_nonzeros_in_h = 0;        
+  for(NodeID vertex_h = 0; vertex_h < number_nodes_in_h; vertex_h++) {
+    for(auto it=(neighborsAndWeights[vertex_h]).begin(); it != (neighborsAndWeights[vertex_h]).end(); ++it) {
+      number_nonzeros_in_h++;
+    }
+  }
+  edgeID number_edges_in_h = number_nonzeros_in_h / 2;        
+
+  //build h
+  h.start_construction(number_nodes_in_h, number_edges_in_h);
+  for(NodeID vertex_h = 0; vertex_h < number_nodes_in_h; vertex_h++) {
+    NodeID node = G.new_node();
+    G.setPartitionIndex(node, 0);
+    for(auto it=(neighborsAndWeights[vertex_h]).begin(); it != (neighborsAndWeights[vertex_h]).end(); ++it) {
+      EdgeID e = G.new_edge(node, it.first());
+      G.setEdgeWeight(e, it.second());
+    }    
+  }
+  return(h);
+}
+
+/*****************************************/
+/*****************************************/
+int64_t alma_graph_access::gainSwapUp(alma_graph_access & g, int64_t v) {
+  int64_t ret = 0;
+  forall_out_edges(g, e, v) {
+    if((vlabels[g.getEdgeTarget(e)]) % 2 == 1) {
+      ret += g.getEdgeWeight(e);
+    } else {
+      ret -= g.getEdgeWeight(e);
+    }
+  } endfor
+  return(ret);
+}
+
+/*****************************************/
+/*****************************************/
+int64_t alma_graph_access::gainSwapDown(alma_graph_access & g, int64_t w) {
+  int64_t ret = 0;
+  forall_out_edges(g, e, w) {
+    if((vlabels[g.getEdgeTarget(e)]) % 2 == 0) {
+      ret += g.getEdgeWeight(e);
+    } else {
+      ret -= g.getEdgeWeight(e);
+    }
+  } endfor
+  return(ret);
+}
+
+/*****************************************/
+/*****************************************/
+EdgeWeight alma_graph_access::getWeightBetween(alma_graph_access & g, int64_t v, int64_t w) {
+  EdgeWeight ret = 0;
+  int64_t i = voffs[v];
+  while((ret == 0) && (i < voffs[v + 1])) {
+    if(target[i] == w) {
+      ret+=ewgt[i];
+    }
+    i++;
+  }
+  return(ret);
+}
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::swapVertexLabelsIntensification(alma_graph_access & g) {
+  for(int64_t v = 0; v < numV ;v++) {
+    int64_t vLab = vlabels[v];
+    if(vLab % 2 == 0) {
+      int64_t wLab = vLab + 1;
+      int64_t w = label2vertex[1 + vLab];
+      if(w >= 0) {//w is a vertex of g
+	int64_t subtrahend = 2 * getWeightBetween(v, w);
+	int64_t gain = gainSwapUp(v) + gainSwapDown(w) - subtrahend;
+	if((gain > 0) || ((gain == 0) && (rand() % 2))) {//swap labels of v and w
+	  //cout << "Positive intensification gain of " << gain << endl;
+	  vlabels[v] = wLab;
+	  vlabels[w] = vLab;
+	  label2vertex[vLab] = w;
+	  label2vertex[wLab] = v;
+	} else {
+	  //cout << "Nix intensification gain" << endl;
+	}
+      }
+    }
+  }
+}
+
+/*****************************************/
+/*****************************************/
+alma_graph_access::swapVertexLabelsDiversification(alma_graph_access & g) {
+  srand((uint)(time(NULL)));
+  for(int64_t v = 0; v < numV ;v++) {
+    int64_t vLab = vlabels[v];
+    if(vLab % 2 == 0) {
+      int64_t wLab = vLab + 1;
+      int64_t w = label2vertex[1 + vLab];
+      if(w >= 0) {//w is a vertex of g
+	int64_t summand = 2 * getWeightBetween(v, w);
+	//following line: roles of v, w swapped w.r.t. intensification
+	int64_t gain = gainSwapUp(w) + gainSwapDown(v) + summand;
+	if((gain > 0) || ((gain == 0) && (rand() % 2))) {//swap labels of v and w
+	  //cout << "Positive diversification gain of " << gain << endl;
+	  vlabels[v] = wLab;
+	  vlabels[w] = vLab;
+	  label2vertex[vLab] = w;
+	  label2vertex[wLab] = v;
+	} else {
+	  //cout << "Nix diversification gain" << endl;
+	}
+      }
+    }
+  }
+}

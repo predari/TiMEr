@@ -1,0 +1,2 @@
+file /amd.home/home/glantz/c+/KarMa/app/SConstruct,line 61:
+	Configure(confdir = .sconf_temp)

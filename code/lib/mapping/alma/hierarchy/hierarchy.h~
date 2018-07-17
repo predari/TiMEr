@@ -1,0 +1,66 @@
+/*
+ * hierarchy.h
+ *
+ *  Created on: Dec 22, 2016
+ *      Author: Roland
+ */
+
+#ifndef HIERARCHY_H
+#define	HIERARCHY_H
+
+#include "../graph/graph.h"
+#include <iostream>
+#include <vector>
+
+using namespace std;
+
+class Hierarchy {
+private:
+    int64_t numLevels;
+    vector<Graph*> graphsVec;
+    vector<vector<int64_t>> parentsVec;
+    
+public:
+    Hierarchy(int64_t numLevels);
+    ~Hierarchy();
+    
+    /**
+     * Get number of levels in the hierarchy
+     * @return numLevels.
+     */
+    int64_t getNumberOfLevels(void);
+
+    /**
+     * Get number of vertices in graph on level l.
+     * param[in] level l.
+     * @return number of vertices in graph on level l.
+     */
+    int64_t getNumberVerticesOnLevel(int64_t l);
+    
+    /**
+     * display neighbors on level l (standard out).
+     * param[in] level l.
+     */
+    void displayParentsOnLevel(int64_t l);
+    
+    /**
+     * Insertion of graph pointer g at position pos of hierarchy.
+     * @param[in] position pos.
+     */
+    void insertGraph(Graph* newG, int64_t pos);
+
+    /**
+     * Insertion of parents at position pos of hierarchy.
+     * @param[in] position pos.
+     */
+    void insertParents(vector<int64_t>& parents, int64_t pos);
+    
+    /**
+     * Update vertex labels of finest graph in hierarchy.
+     * Graph on finest level is modfied
+     */
+    void updateLabelsOnFinestLevel(void);
+};
+
+#endif	/* HIERARCHY_H */
+

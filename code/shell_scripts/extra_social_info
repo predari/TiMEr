@@ -1,0 +1,17 @@
+#!/bin/csh
+ ../bin/graph_info ../data/extra_social/PGPgiantcompo.graph > ../data/extra_social/PGPgiantcompo.info 
+ ../bin/graph_info ../data/extra_social/as-22july06.graph > ../data/extra_social/as-22july06.info 
+ ../bin/graph_info ../data/extra_social/as-skitter.graph > ../data/extra_social/as-skitter.info 
+ ../bin/graph_info ../data/extra_social/citationCiteseer.graph > ../data/extra_social/citationCiteseer.info 
+ ../bin/graph_info ../data/extra_social/coAuthorsCiteseer.graph > ../data/extra_social/coAuthorsCiteseer.info 
+ ../bin/graph_info ../data/extra_social/coAuthorsDBLP.graph > ../data/extra_social/coAuthorsDBLP.info 
+ ../bin/graph_info ../data/extra_social/coPapersCiteseer.graph > ../data/extra_social/coPapersCiteseer.info 
+ ../bin/graph_info ../data/extra_social/coPapersDBLP.graph > ../data/extra_social/coPapersDBLP.info 
+ ../bin/graph_info ../data/extra_social/email-EuAll.graph > ../data/extra_social/email-EuAll.info 
+ ../bin/graph_info ../data/extra_social/loc-brightkite_edges.graph > ../data/extra_social/loc-brightkite_edges.info 
+ ../bin/graph_info ../data/extra_social/loc-gowalla_edges.graph > ../data/extra_social/loc-gowalla_edges.info 
+ ../bin/graph_info ../data/extra_social/p2p-Gnutella04.graph > ../data/extra_social/p2p-Gnutella04.info 
+ ../bin/graph_info ../data/extra_social/soc-Slashdot0902.graph > ../data/extra_social/soc-Slashdot0902.info 
+ ../bin/graph_info ../data/extra_social/web-Google.graph > ../data/extra_social/web-Google.info 
+ ../bin/graph_info ../data/extra_social/wiki-Talk.graph > ../data/extra_social/wiki-Talk.info
+#EOF

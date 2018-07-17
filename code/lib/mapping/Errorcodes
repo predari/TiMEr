@@ -1,0 +1,42 @@
+200 - Extension, respectively depth of processor graph must be at least two.
+201 - Extension of grids and tori must not be greater than three.
+202 - Grids and tori must have same extensions in all dimensions.
+203 - Extension of grids and tori must a power of two.
+204 - Vector of extensions and vector of bandwidths must have same length (for trees).
+205 - Vector of bandwidths should have length equal to log_2(extension) (for grids and tori).
+206 - This type of processor graph does not exist.
+
+120 - Wrong number of parameters. Correct usage: ./bench MAPPING PARTFILE GRAPHFILE #PARTS PROCGRAPH SIZE WEIGHTS
+130 - Mapping not surjective.
+131 - Mapping not injective.
+132 - Process mapped to switch.
+
+200 - Invalid size.
+Tree:
+210 - Size & Weights got different lengths.
+2DTorus:
+220 - No negative or zero weights.
+221 - Size too small! Needs to be at least 3.
+222 - Wrong size of weight vector.
+3DTorus:
+230 - No negative or zero weights.
+231 - Size too small! Needs to be at least 3.
+232 - Wrong size of weight vector.
+2DGrid:
+240 - No negative or zero weights.
+241 - Size too small! Needs to be at least 2.
+242 - Wrong size of weight vector.
+3DGrid:
+250 - No negative or zero weights.
+251 - Size too small! Needs to be at least 2.
+252 - Wrong size of weight vector.
+
+300 - Can't open graphfile.
+310 - Can't open partfile.
+
+400 - The processor graph and the communication graph have a different number of nodes.
+410 - Mapping name not found.
+411 - Mapping name not found.
+
+420,421 - Internal error while parsing in multikahip.
+430,431 - Internal error while parsing in multisimple.

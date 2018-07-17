@@ -1,0 +1,87 @@
+/*
+ * permutation.cpp
+ *
+ *  Created on: Jan 02, 2017
+ *      Author: Roland
+*/
+
+#include "hierarchy.h"
+
+using namespace std;
+
+/*****************************************/
+/*****************************************/
+Hierarchy::Hierarchy(int64_t nl) {
+    numLevels = nl;
+    graphsVec.resize(nl);
+    parentsVec.resize(nl);
+}
+
+/***************************************************************/
+/* All graphs, except the one on the finest level, are deleted */
+/***************************************************************/
+Hierarchy::~Hierarchy(void) {
+    for(int64_t l = 1; l < numLevels; l++) {
+        delete(graphsVec[l]);
+        (parentsVec[l]).resize(0);
+    }
+}
+
+/*****************************************/
+/*****************************************/
+int64_t Hierarchy::getNumberOfLevels(void) {
+    return(numLevels);
+}
+
+/*****************************************/
+/*****************************************/
+int64_t Hierarchy::getNumberVerticesOnLevel(int64_t l) {
+    return((graphsVec[l])->getNumVertices());
+}
+
+/*****************************************/
+/*****************************************/
+void Hierarchy::displayParentsOnLevel(int64_t l) {
+  for(int64_t i = 0; i < (int64_t)((parentsVec[l]).size()); i++) {
+        cout << (parentsVec[l])[i] << " ";
+    }
+    cout << endl;
+}
+
+/*****************************************/
+/*****************************************/
+void Hierarchy::insertGraph(Graph* newG, int64_t pos) {
+    graphsVec[pos] = newG;
+}
+
+/*****************************************/
+/*****************************************/
+void Hierarchy::insertParents(vector<int64_t>& parents, int64_t pos) {
+    parentsVec[pos] = parents;
+}
+
+/*****************************************/
+/*****************************************/
+void Hierarchy::updateLabelsOnFinestLevel(void) {
+    Graph* f = graphsVec[0];
+    int64_t incFromMostSigDigit = 1 << numLevels;
+    for(int64_t v = 0; v < f->getNumVertices(); v++) {
+        int64_t newLabel_v = (f->getLabel(v)) % 2;//least significant digit
+        if(f->getLabel(v) >= incFromMostSigDigit) {
+            newLabel_v += incFromMostSigDigit;//most significant digit
+        }
+        int64_t oldParentVertex = v;
+        int64_t exp = 0;
+        while(exp < numLevels - 1) {
+            int64_t parentVertex = (parentsVec[exp])[oldParentVertex];
+            exp++;
+            int64_t parentLabel = (graphsVec[exp])->getLabel(parentVertex);
+            //cout << "parentLabel is " << parentLabel << endl;
+            newLabel_v += (parentLabel % 2) << exp;
+            //if(exp == 2) cout << "exp = 2:::newLabel_v is " << newLabel_v << endl;
+            oldParentVertex = parentVertex;
+        }
+        f->setLabel(v, newLabel_v);
+    }
+    f->makeVectorLabel2Vertex();
+}

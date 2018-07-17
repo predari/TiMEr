@@ -1,0 +1,612 @@
+/*
+ * graph.cpp
+ *
+ *  Created on: Feb 14, 2017
+ *      Author: Roland */
+
+#include "../../alma_graph_access.h"
+#include "../permutation/permutation.h"
+#include "../utils/memory.h"
+#include "../utils/arith.h"
+#include <stdlib.h>
+#include <string>
+#include <iostream>
+#include <math.h>
+#include <map>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <stdio.h>
+#include <queue>
+
+using namespace std;
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::setNumDigitsL(int64_t ndl) {
+  numDigitsL = ndl;
+}
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::setNumL(int64_t nl) {
+  numDigitsL = nl;
+}
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::getVertexLabelsFromPartition(alma_graph_access & g) {
+  /* Initially, vector vlabels contain the block IDs of the vertices. */
+  /* Block IDs are not necessarily consecutive! */
+  
+  int64_t maxBlockID = 0;
+  for(int64_t v = 0; v < g.number_of_nodes(); v++) {
+    if (vlabels[v] > maxBlockID) {
+      maxBlockID = vlabels[v];
+    }
+  }
+  numDigitsBlockID = ceilLog2((double) (maxBlockID + 1));//OUTPUT PARAMETER!
+  cout << "numDigitsBlockID is " << numDigitsBlockID << endl;
+  
+  unordered_map<int64_t, int64_t> blockHits;
+  for(int64_t v = 0; v < g.number_of_nodes(); v++) {
+    if(blockHits.find(vlabels[v]) == blockHits.end()) {
+      blockHits[vlabels[v]] = 1;
+    } else {
+      (blockHits[vlabels[v]])++;
+    }
+  }
+  
+  int64_t maxBlockSize = 0;
+  for(unordered_map<int64_t,int64_t>::iterator it=blockHits.begin(); it != blockHits.end(); ++it) {
+    if(it->second > maxBlockSize) {
+      maxBlockSize = it->second;
+    }
+  }
+  
+  numDigitsForID = ceilLog2((double) maxBlockSize);//OUTPUT PARAMETER!
+  cout << "numDigitsForID is " << numDigitsForID << endl;
+  
+  numDigitsL = numDigitsBlockID + numDigitsForID;//OUTPUT PARAMETER!
+  numL = 1LL << numDigitsL;//OUTPUT PARAMETER!
+  cout << "The labels have " << numDigitsL << " digits" << endl;
+  
+  Permutation rho(numDigitsForID);
+  rho.ini();
+  //cout << "rho from construction: " << endl;
+  //rho.display();
+  
+  rho.shuffle();
+  cout << "rho: " << endl;
+  rho.display();
+  
+  //reset blockHits
+  blockHits.clear();
+  
+  //assignment of initial labels
+  for(int64_t v = 0; v < g.number_of_nodes(); v++) {
+    int64_t vID = 0;
+    if(blockHits.find(vlabels[v]) == blockHits.end()) {
+      blockHits[vlabels[v]] = 1;
+    } else {
+      vID = blockHits[vlabels[v]];
+      (blockHits[vlabels[v]])++;
+    }
+    vlabels[v] = (vlabels[v]) << numDigitsForID;
+    vlabels[v]+= rho.permute(vID);
+  }
+}
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::permuteVertexLabels(alma_graph_access & g, Permutation pi) {
+  label2vertex.clear();
+  for(int64_t v = 0; v < g.number_of_nodes(); v++) {
+    int64_t newLabel = pi.permute(vlabels[v]);
+    vlabels[v] = newLabel;
+    label2vertex[newLabel] = v;
+  }
+}
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::makeLabel2Vertex(alma_graph_access & g){
+  forall_nodes(g, v) {
+    label2vertex[vlabels[v]] = v;
+  } endfor
+}
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::display(alma_graph_access & g) {
+  cout << endl;
+  cout << "*************************************************" << endl;
+  cout << "   Number of vertices is " << g.number_of_nodes() << endl;
+  cout << "   Number of edges is " << g.number_of_edges() / 2 << endl;
+  //cout << "   Number of blocks is " << partition_config.k << endl;
+  cout << "   Number of labels is " << numL << endl;
+  cout << "   Number of digits of labels is " << numDigitsL << endl;
+  cout << "   numDigitsBlockID is " << numDigitsBlockID << endl;
+  cout << "   numDigitsForID is " << numDigitsForID << endl;
+
+  forall_nodes(g, v) {
+    cout << "      vertex " << v << " has label " << vlabels[v] << endl;
+  } endfor
+      cout << endl;
+
+  forall_nodes(g, v) {
+    forall_out_edges(g, e, v) {
+      cout << "      edge from " << v << " to " << g.getEdgeTarget(e) << " has weight " << g.getEdgeWeight(e) << endl;
+    } endfor
+	} endfor
+	    }
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::getDistances2vertex(alma_graph_access & g, vector<int64_t> &dist2v, int64_t v) {
+  forall_nodes(g, v) {
+    dist2v[v] = UNDEFINED_NODE;
+  } endfor
+    
+      queue<int64_t> q;
+  q.push(v);
+  dist2v[v] = 0;
+  while(q.empty() == false) {
+    int64_t f = q.front();
+    int64_t newDist = 1 + dist2v[f];
+    q.pop();
+    forall_out_edges(g, e, f) {
+      NodeID t = g.getEdgeTarget(e);
+      if(dist2v[t] == UNDEFINED_NODE) {
+	q.push(t);
+	dist2v[t] = newDist;
+      }
+    } endfor
+	}
+}
+
+/*****************************************/
+/*****************************************/
+bool alma_graph_access::getLabelsPartialCube(alma_graph_access & g) {
+  bool ret = true;
+  int64_t edgeID_outer = 0;
+  int64_t digit = 0;
+  vector<bool> edgeMarked(g.number_of_edges(), false);
+  vector<int64_t> dist2v(g.number_of_nodes());
+  vector<int64_t> dist2w(g.number_of_nodes());
+  vlabels.resize(g.number_of_nodes());
+  forall_nodes(g, v) {
+    forall_out_edges(g, e, v) {
+      NodeID w = g.getEdgeTarget(e);
+      if((v < w) && (edgeMarked[edgeID_outer] == false)) {
+	//cout << "v and w are " << v << " and " << w << endl;
+	getDistances2vertex(g, dist2v, v);
+	getDistances2vertex(g, dist2w, w);
+	EdgeID edgeID_inner = 0;
+	forall_nodes(g, vv) {
+	  forall_out_edges(g, ee, vv) {
+	    NodeID ww = g.getEdgeTarget(ee);
+	    if(vv < ww) {
+	      //cout << "   vv and ww are " << vv << " and " << ww << endl;
+	      if(dist2v[vv] == dist2v[ww]) {
+		cout << "vertices " << vv << " and " << ww << " both have distance " << dist2v[vv] << " to " << v << endl;
+		cout << "NOT A PARTIAL CUBE" << endl;
+		return(false);
+	      }
+	      if(dist2w[vv] == dist2w[ww]) {
+		cout << "vertices " << vv << " and " << ww << " both have distance " << dist2w[vv] << " to " << w << endl;
+		cout << "NOT A PARTIAL CUBE" << endl;
+		return(false);
+	      }
+	      if((dist2v[vv] + dist2w[ww]) != (dist2w[vv] + dist2v[ww])) {
+		if(edgeMarked[edgeID_inner] == true) {
+		  cout << "Edge " << edgeID_inner << " is in more than one cutset" << endl;
+		  cout << "NOT A PARTIAL CUBE" << endl;
+		  return(false);
+		}
+		//cout << "      Marking the edge between " << vv << " and " << ww << endl;
+		edgeMarked[edgeID_inner] = true;
+	      }
+	    }
+	    edgeID_inner++;
+	  } endfor
+	      } endfor
+		  forall_nodes(g, u) {
+	  if(dist2w[u] < dist2v[u]) {
+	    vlabels[u] += (1LL << digit);
+	  }
+	} endfor
+	digit++;
+      }
+      edgeID_outer++;
+    } endfor
+	} endfor
+	    return(ret);
+}
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::statisticsOnMissfits(alma_graph_access & g) {
+  for(int64_t pos = 0; pos < numDigitsL; pos++) {
+    int64_t numMissfits = 0;
+    forall_nodes(g, v1) {
+      int64_t label1 = vlabels[v1];
+      int64_t label2 = flipPosition(pos, label1);
+      if(label2vertex.find(label2) == label2vertex.end()) {//label2 does not exist
+	numMissfits++;
+      }
+    } endfor
+	cout << "Number of missfits at position " << pos << " is " << numMissfits << endl;
+  }
+}
+
+/*****************************************/
+/*****************************************/
+NodeID alma_graph_access::getVertexWithLabel(int64_t l) {
+  if(label2vertex.find(l) != label2vertex.end()) {
+    return(label2vertex[l]);
+  } else {
+    return(UNDEFINED_NODE);
+  }
+}
+
+/*****************************************/
+/*****************************************/
+int64_t alma_graph_access::getTotalCut(alma_graph_access & g) {
+  int64_t ret = 0;
+  forall_nodes(g, v) {
+    forall_out_edges(g, e, v) {
+      NodeID w = g.getEdgeTarget(e);
+      if(((vlabels[v]) >> getNumDigitsForID()) != ((vlabels[w]) >> getNumDigitsForID())) {
+	ret += g.getEdgeWeight(e);
+      }
+    } endfor
+	} endfor
+	    return(ret/2);
+}
+
+/*****************************************/
+/*****************************************/
+bool alma_graph_access::checkPartition(alma_graph_access & g, int64_t numB) {
+
+  //cout << "still alive 1" << endl;
+  vector<int64_t> blockID2blockLabel(numB);
+  //cout << "still alive 2" << endl;
+  unordered_map<int64_t, int64_t> blockLabel2blockID;
+  //cout << "still alive 3" << endl;
+  int64_t blockID = 0;
+  forall_nodes(g, v) {
+    //cout << "still alive 31::vlabels[v] is " << vlabels[v] << endl;
+    int64_t blockLabel_of_v = (vlabels[v] >> numDigitsForID);
+    //cout << "still alive 32:: blockLabel_of_v is " << blockLabel_of_v << endl;
+
+    //cout << "still alive 321" << endl;
+    unordered_map<int64_t, int64_t>::const_iterator got = blockLabel2blockID.find(blockLabel_of_v);
+    //cout << "still alive 322" << endl;
+
+    if(got != blockLabel2blockID.end()) {
+      //cout << "got->first is " << got->first << endl;
+      //cout << "got->second is " << got->second << endl;
+    }
+
+    if(blockLabel2blockID.find(blockLabel_of_v) == blockLabel2blockID.end()) {
+      //cout << "still alive 33" << endl;
+      blockLabel2blockID[blockLabel_of_v] = blockID;
+      //cout << "still alive 34" << endl;
+      blockID2blockLabel[blockID] = blockLabel_of_v;
+      //cout << "still alive 35" << endl;
+      blockID++;
+      //cout << "still alive 36" << endl;
+    }
+    //cout << "still alive 37" << endl;
+    //cout << endl;
+  } endfor
+  //cout << "still alive 4" << endl;
+  cout << "GGraph has " << blockID << " blocks" << endl;
+
+  vector<int64_t> sizeOfBlock(numB,0);
+  forall_nodes(g, v) {
+    int64_t blockLabel_of_v = (vlabels[v] >> numDigitsForID);
+    (sizeOfBlock[blockLabel2blockID[blockLabel_of_v]])++;
+  } endfor
+      int64_t minBlockSize = g.number_of_nodes();
+  int64_t maxBlockSize = 0;
+  for(int64_t b = 0; b < numB ;b++) {
+    if(sizeOfBlock[b] < minBlockSize) {
+      minBlockSize = sizeOfBlock[b];
+    }
+    if(sizeOfBlock[b] > maxBlockSize) {
+      maxBlockSize = sizeOfBlock[b];
+    }
+  }
+  cout << "Minimum and maximum block sizes are " << minBlockSize << " and " << maxBlockSize << endl;
+  return(blockID == numB);
+}
+
+/** maria **/
+
+/*****************************************/
+/*****************************************/
+int64_t alma_graph_access::getMaxCommunicationCost(alma_graph_access & g) {
+  EdgeWeight ret = 0;
+  EdgeWeight max = 0;
+  int64_t edgeCount = 0;
+  forall_nodes(g, v) {
+    forall_out_edges(g, e, v) {
+      NodeID w = g.getEdgeTarget(e);
+      ret = hammingDistance((vlabels[v]) >> numDigitsForID, (vlabels[w]) >> numDigitsForID);
+      // maria cout << "edge (" << v <<"," << w <<") : " << e << " has volume = " << ret << endl; 
+      if(ret > max)
+	max = ret;
+      edgeCount = edgeCount + 1;
+    } endfor
+	} endfor
+     // maria cout << "edge count: " << g.number_of_edges() <<" = " << edgeCount << " ? " << endl;
+  return(max);
+}
+
+
+int64_t alma_graph_access::getMaxDegree(alma_graph_access & g) {
+
+  int64_t max = 0;
+  vector<int> degree(g.number_of_nodes(), 0);
+  forall_nodes(g, v) {
+    forall_out_edges(g, e, v) {
+      degree[v] = degree[v] + 1;
+    } endfor
+	} endfor
+  forall_nodes(g, v) {
+    if(degree[v] > max)
+      max = degree[v];
+  } endfor
+  return(max);
+}
+
+int64_t alma_graph_access::getMinDegree(alma_graph_access & g) {
+
+  int64_t min = g.number_of_edges() + 1;
+  vector<int> degree(g.number_of_nodes(), 0);
+  forall_nodes(g, v) {
+    forall_out_edges(g, e, v) {
+      degree[v] = degree[v] + 1;
+    } endfor
+	} endfor
+  forall_nodes(g, v) {
+    if(degree[v] < min)
+      min = degree[v];
+  } endfor
+  return(min);
+}
+
+
+double alma_graph_access::getMeanDegree(alma_graph_access & g) {
+
+  double total = 0;
+  vector<int> degree(g.number_of_nodes(), 0);
+  forall_nodes(g, v) {
+    forall_out_edges(g, e, v) {
+      total = total + 1;
+    } endfor
+	} endfor
+  total = total / g.number_of_nodes();
+  return(total);
+}
+
+/****************** end ******************/
+/** maria **/
+
+/*****************************************/
+/*****************************************/
+int64_t alma_graph_access::getTotalCommunicationCost(alma_graph_access & g) {
+  EdgeWeight ret = 0;
+  forall_nodes(g, v) {
+    forall_out_edges(g, e, v) {
+      NodeID w = g.getEdgeTarget(e);
+      ret+=hammingDistance((vlabels[v]) >> numDigitsForID, (vlabels[w]) >> numDigitsForID);
+    } endfor
+	} endfor
+  return(ret/2);
+}
+
+/*****************************************/
+/*****************************************/
+int64_t alma_graph_access::getTotalHammingDistance(alma_graph_access & g) {
+  EdgeWeight ret = 0;
+  forall_nodes(g, v) {
+    forall_out_edges(g, e, v) {
+      NodeID w = g.getEdgeTarget(e);
+      ret+=hammingDistance(vlabels[v], vlabels[w]);
+    } endfor
+	} endfor
+	    return(ret/2);
+}
+
+/*****************************************/
+/*****************************************/
+alma_graph_access* alma_graph_access::contract(alma_graph_access* h_ptr, alma_graph_access& g, vector<NodeID>& parents) {
+  //initialization
+  h_ptr->numDigitsL = g.numDigitsL - 1;
+  h_ptr->numL = (g.numL) / 2;
+  parents.resize(g.number_of_nodes());
+  
+  //find number of vertices in h and build h_ptr->label2vertex, parents
+  NodeID number_nodes_in_h = 0;
+  forall_nodes(g, v) {
+    int64_t shortenedLabel_v = g.getLabel(v) >> 1;//shortendedLabel_v will be a label of a vertex of h
+    if((h_ptr->label2vertex).find(shortenedLabel_v) == (h_ptr->label2vertex).end()) {//shortendedLabel_v not yet encountered
+      h_ptr->label2vertex[shortenedLabel_v] = number_nodes_in_h;
+      parents[v] = number_nodes_in_h;
+      number_nodes_in_h++;
+    } else {
+      parents[v] = h_ptr->label2vertex[shortenedLabel_v];
+    }
+  } endfor
+      
+      //write h->vlabels
+      h_ptr->vlabels.resize(number_nodes_in_h);
+  for (unordered_map<int64_t, NodeID>::iterator it = (h_ptr->label2vertex).begin(); it != (h_ptr->label2vertex).end(); ++it) {
+    h_ptr->setLabel(it->second, it->first);
+  }
+
+  //for each vertex, vertex_h, find its neighbors and the weights of the edges to these neighbors
+  vector<map<NodeID, EdgeWeight>> neighborsAndWeights(number_nodes_in_h);
+  for(NodeID vertex_h = 0; vertex_h < number_nodes_in_h; vertex_h++) {
+    int64_t label_g0 = ((uint64_t)(h_ptr->vlabels[vertex_h])) << 1;
+    int64_t label_g1 = label_g0 + 1;
+    //vertices_with labels label_g0 and label_g1, if they exist, are vertices of g that will be contracted to vertex_h
+    //at least one of these vertices exist
+    if((g.label2vertex).find(label_g0) != (g.label2vertex).end()) {//g has a label with vertex label_g0
+      NodeID vertex_g0 = g.label2vertex[label_g0];
+      forall_out_edges(g, e, vertex_g0) {
+	NodeID neigh = h_ptr->getVertexWithLabel((g.getLabel(g.getEdgeTarget(e))) >> 1);
+	if(neigh != vertex_h) {//neigh is a neighbor of vertex_h
+	  std::pair<std::map<NodeID, EdgeWeight>::iterator,bool> ret =
+	    (neighborsAndWeights[vertex_h]).insert(std::pair<NodeID,EdgeWeight>(neigh, g.getEdgeWeight(e)));
+	  if(ret.second == false) {
+	    ret.first->second+= g.getEdgeWeight(e);
+	  }
+	}
+      } endfor
+	  }
+    if((g.label2vertex).find(label_g1) != (g.label2vertex).end()) {//g has a label with vertex label_g1
+      NodeID vertex_g1 = g.label2vertex[label_g1];
+      forall_out_edges(g, e, vertex_g1) {
+	NodeID neigh = h_ptr->getVertexWithLabel((g.getLabel(g.getEdgeTarget(e))) >> 1);
+	if(neigh != vertex_h) {//neigh is a neighbor of vertex_h
+	  std::pair<std::map<NodeID, EdgeWeight>::iterator, bool> ret =
+	    (neighborsAndWeights[vertex_h]).insert(std::pair<NodeID, EdgeWeight>(neigh, g.getEdgeWeight(e)));
+	  if(ret.second == false) {
+	    ret.first->second+= g.getEdgeWeight(e);
+	  }
+	}
+      } endfor
+	  }
+  }
+  
+  //cout << "still alive CONTRACT 2" << endl;
+  //determine number of nonzeros and edges in h
+  EdgeID number_nonzeros_in_h = 0;        
+  for(NodeID vertex_h = 0; vertex_h < number_nodes_in_h; vertex_h++) {
+    for(auto it=(neighborsAndWeights[vertex_h]).begin(); it != (neighborsAndWeights[vertex_h]).end(); ++it) {
+      number_nonzeros_in_h++;
+    }
+  }
+
+  //cout << "still alive CONTRACT 3" << endl;
+  //build h
+  h_ptr->start_construction(number_nodes_in_h, number_nonzeros_in_h);
+  //cout << "still alive CONTRACT 31" << endl;
+  for(NodeID vertex_h = 0; vertex_h < number_nodes_in_h; vertex_h++) {
+    NodeID node = h_ptr->new_node();
+    h_ptr->setNodeWeight(node, 1);
+    h_ptr->setPartitionIndex(node, 0);
+    for(auto& it: neighborsAndWeights[vertex_h]) {
+      EdgeID e = h_ptr->new_edge(node, it.first);
+      h_ptr->setEdgeWeight(e, it.second);
+      //cout << "CONTRACT: it.first and it.second are " << it.first << " and " << it.second << endl;
+    }
+    //cout << "still alive 111" << endl;   
+  }
+  h_ptr->finish_construction();
+  //cout << "still alive 112" << endl;
+  //std::cout <<  "graph has " <<  h_ptr->number_of_nodes() <<  " nodes and " <<  h_ptr->number_of_edges() <<  " edges"  << std::endl;
+  return(h_ptr);
+}
+
+/*****************************************/
+/*****************************************/
+int64_t alma_graph_access::gainSwapUp(alma_graph_access & g, int64_t v) {
+  int64_t ret = 0;
+  forall_out_edges(g, e, v) {
+    if((vlabels[g.getEdgeTarget(e)]) % 2 == 1) {
+      ret += g.getEdgeWeight(e);
+    } else {
+      ret -= g.getEdgeWeight(e);
+    }
+  } endfor
+ return(ret);
+}
+
+/*****************************************/
+/*****************************************/
+int64_t alma_graph_access::gainSwapDown(alma_graph_access & g, int64_t w) {
+  int64_t ret = 0;
+  forall_out_edges(g, e, w) {
+    if((vlabels[g.getEdgeTarget(e)]) % 2 == 0) {
+      ret += g.getEdgeWeight(e);
+    } else {
+      ret -= g.getEdgeWeight(e);
+    }
+  } endfor
+ return(ret);
+}
+
+/*****************************************/
+/*****************************************/
+EdgeWeight alma_graph_access::getWeightBetween(alma_graph_access & g, int64_t v, int64_t w) {
+  EdgeWeight ret = 0;
+  forall_out_edges(g, e, v) {
+    if(g.getEdgeTarget(e) == w) {
+      ret+=g.getEdgeWeight(e);
+      break;
+    }
+  } endfor
+ return(ret);
+}
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::swapVertexLabelsIntensification(alma_graph_access & g, int64_t digit) {
+  forall_nodes(g, v) {
+    int64_t vLab = vlabels[v];
+    if(vLab % 2 == 0) {
+      int64_t wLab = vLab + 1;
+      if(label2vertex.find(wLab) != label2vertex.end()) {
+	int64_t w = label2vertex[wLab];
+	int64_t subtrahend = 2 * getWeightBetween(g, v, w);
+	int64_t gain = gainSwapUp(g, v) + gainSwapDown(g, w) - subtrahend;
+	if((gain > 0) || ((gain == 0) && (rand() % 2))) {//swap labels of v and w
+	  //cout << "   Intensification gain of " << gain << " for digit " << digit << endl;
+	  vlabels[v] = wLab;
+	  vlabels[w] = vLab;
+	  label2vertex[vLab] = w;
+	  label2vertex[wLab] = v;
+	}
+      }
+    }
+  } endfor
+}
+
+/*****************************************/
+/*****************************************/
+void alma_graph_access::swapVertexLabelsDiversification(alma_graph_access & g, int64_t digit) {
+  forall_nodes(g, v) {
+    int64_t vLab = vlabels[v];
+    if(vLab % 2 == 0) {
+      int64_t wLab = vLab + 1;
+      if(label2vertex.find(wLab) != label2vertex.end()) {
+	int64_t w = label2vertex[wLab];
+	int64_t summand = 2 * getWeightBetween(g, v, w);
+	//following line: roles of v, w swapped w.r.t. intensification
+	int64_t gain = gainSwapUp(g, w) + gainSwapDown(g, v) + summand;
+	if((gain > 0) || ((gain == 0) && (rand() % 2))) {//swap labels of v and w
+	  //cout << "   Diversification gain of " << gain << " for digit " << digit << endl;
+	  vlabels[v] = wLab;
+	  vlabels[w] = vLab;
+	  label2vertex[vLab] = w;
+	  label2vertex[wLab] = v;
+	}
+      }
+    }
+  } endfor
+}
+
+/*****************************************/
+/*****************************************/
+alma_graph_access::alma_graph_access(void) {
+}
+
+/*****************************************/
+/*****************************************/
+alma_graph_access::~alma_graph_access(void) {
+}

@@ -1,0 +1,15 @@
+input folder for input data
+output folder for the output of the R scripts
+
+$Rscript bench-map-collection.R data pdf : compute the relative average between two methods for each metric grouped by collection
+data  = ('METHOD','COLLECTION','FILE','TOPOLOGY','SEED','DURATION','MAXCON','MAXDIL','AVGDIL','CUT','TCV')
+
+$Rscript bench-map.R data pdf : compute the relative average between two methods of all graphs for each metric
+data  = ('METHOD','COLLECTION','FILE','TOPOLOGY','SEED','DURATION','MAXCON','MAXDIL','AVGDIL','CUT','TCV')
+
+$Rscript bench-map.R data pdf : compute the relative average between two methods of all graphs for each metric
+
+For initial mappings of Kahip and Scotch to get the average time values:
+$Rscript benchKAHIP-graph.R data pdf
+data <- c('FILE','METHOD','UBFACTOR','NPARTS','SEED','EC','TIME')
+Here we dont care about the pdf but the average time values that are given at stdout
