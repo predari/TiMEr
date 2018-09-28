@@ -1,0 +1,7 @@
+* Settings and commands to use Karma
+1) set the environmental variable ~OMPI_CXX~ to use ~g++-7~ as back-end compiler for mpicc
+2) the building tool is scons http://scons.org. Project includes a SConstruct file
+3) in ~SConscript~ set the ccppath to you mpi installation (~/usr/local/bin/~)
+4) compile example: ~$scons program=mapScenarioTiME variant=optimized -j 4~
+5) clean: ~scons -c~
+6) execute: ~./bin/partScenario ../../Data/PGPgiantcompo.graph --k=512 --seed=1 --preconfiguration=ecosocial --imbalance=5~ or ~./bin/mapScenarioTiME ../../Data/PGPgiantcompo.graph --k=512 --seed=1 --preconfiguration=ecosocial --imbalance=5 --proc_graph_type=grid --proc_graph_extensions=8x8x8 --proc_graph_bandwidths=1x1x1 --mapping_algo=brandfassL --numberHierarchies=10~
