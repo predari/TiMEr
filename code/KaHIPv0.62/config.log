@@ -1,2 +1,2 @@
-file /Users/mpredari/Documents/PostDoc/Software/mapping/KarMa_withoutData/KarMa_sequential/KaHIPv0.62/SConstruct,line 97:
+file /Users/mpredari/Documents/PostDoc/Software/mapping/TiMEr/code/KaHIPv0.62/SConstruct,line 97:
 	Configure(confdir = .sconf_temp)
